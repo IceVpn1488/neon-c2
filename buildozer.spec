@@ -8,25 +8,23 @@ source.include_exts = py,png,jpg,kv,atlas
 
 version = 1.0.0
 
-requirements = python3,kivy==2.3.0,aiohttp,openssl,multidict,yarl,attrs,aiosignal,frozenlist,idna,async_timeout,charset_normalizer,chardet
+requirements = python3==3.11.5,kivy==2.3.0,aiohttp==3.9.5,openssl
 
 orientation = portrait
 fullscreen = 0
 
-# Android specific
-android.permissions = INTERNET,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE
-android.api = 33
+android.permissions = INTERNET,ACCESS_NETWORK_STATE
+android.api = 31
 android.minapi = 21
 android.ndk = 25b
-android.sdk = 33
+android.sdk = 31
 android.archs = arm64-v8a
 android.allow_backup = True
 android.accept_sdk_license = True
 android.logcat_filters = *:S python:D
 
-# splash
-presplash.filename = %(source.dir)s/presplash.png
-icon.filename = %(source.dir)s/icon.png
+p4a.python_version = 3.11.5
+p4a.branch = master
 
 [buildozer]
 log_level = 2
