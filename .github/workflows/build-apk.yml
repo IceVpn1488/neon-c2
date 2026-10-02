@@ -1,84 +1,31 @@
-name: Build Android APK
+[app]
+title = Neon C2
+package.name = neonc2
+package.domain = com.icevpn
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas
 
-jobs:
-  build-android:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
+version = 1.0.0
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+requirements = python3==3.11.5,kivy==2.3.0,aiohttp==3.9.5,openssl
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+orientation = portrait
+fullscreen = 0
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+android.permissions = INTERNET,ACCESS_NETWORK_STATE
+android.api = 31
+android.minapi = 21
+android.ndk = 25b
+android.sdk = 31
+android.archs = arm64-v8a
+android.allow_backup = True
+android.accept_sdk_license = True
+android.logcat_filters = *:S python:D
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            git zip unzip openjdk-17-jdk python3-pip \
-            autoconf libtool pkg-config zlib1g-dev \
-            libncurses5-dev libncursesw5-dev libtinfo6 \
-            cmake libffi-dev libssl-dev automake autopoint \
-            gettext
+p4a.python_version = 3.11.5
+p4a.branch = master
 
-      - name: Install buildozer and cython
-        run: |
-          python -m pip install --upgrade pip
-          pip install buildozer==1.5.0 cython==0.29.36
-
-      - name: Cache Buildozer global directory
-        uses: actions/cache@v4
-        with:
-          path: ~/.buildozer
-          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            buildozer-global-
-
-      - name: Cache Buildozer local directory
-        uses: actions/cache@v4
-        with:
-          path: .buildozer
-          key: buildozer-local-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            buildozer-local-
-
-      - name: Build APK with Buildozer
-        run: |
-          set -o pipefail
-          buildozer -v android debug 2>&1 | tee buildozer_full.log
-
-      - name: Show last 200 lines of build log if failed
-        if: failure()
-        run: |
-          echo "=== LAST 200 LINES OF BUILD LOG ==="
-          tail -200 buildozer_full.log
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: buildozer-log
-          path: buildozer_full.log
-          retention-days: 7
-
-      - name: Upload APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: neon-c2-apk
-          path: bin/*.apk
-          retention-days: 30
+[buildozer]
+log_level = 2
+warn_on_root = 1
